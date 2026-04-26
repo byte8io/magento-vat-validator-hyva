@@ -1,0 +1,26 @@
+{
+    "name": "byte8/module-vat-validator-hyva",
+    "description": "Hyvä-themed live VAT validation indicator for Byte8_VatValidator (registration form + checkout).",
+    "type": "magento2-module",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Byte8 Ltd",
+            "email": "helo@byte8.io"
+        }
+    ],
+    "require": {
+        "php": "^8.1|^8.2|^8.3|^8.4|^8.5",
+        "byte8/module-vat-validator": "*",
+        "magento/framework": "^103.0",
+        "magento/module-customer": "^103.0"
+    },
+    "autoload": {
+        "files": [
+            "registration.php"
+        ],
+        "psr-4": {
+            "Byte8\\VatValidatorHyva\\": ""
+        }
+    }
+}

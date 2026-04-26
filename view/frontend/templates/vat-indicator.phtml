@@ -1,0 +1,105 @@
+<?php
+/**
+ * Copyright © Byte8 Ltd. All rights reserved.
+ * See LICENSE.txt for license details.
+ *
+ * Hyvä-themed live VAT validation indicator.
+ *
+ * Watches the standard Magento `taxvat` field (and `country` dropdown if
+ * available) and calls the Byte8 VAT Validator REST endpoint with debounce.
+ * No external JS dependencies — Alpine + Tailwind only, both already in
+ * Hyvä.
+ *
+ * Falls back gracefully: if the REST endpoint is unreachable or returns
+ * "unavailable" / "skipped", the indicator simply hides itself rather than
+ * showing a misleading red badge.
+ */
+
+/** @var \Magento\Framework\View\Element\Template $block */
+$baseUrl = $block->escapeUrl(rtrim((string) $block->getBaseUrl(), '/'));
+?>
+<div
+    x-data="{
+        endpoint: '<?= /* @noEscape */ $baseUrl ?>/rest/V1/byte8-vat-validator/validate',
+        status: null,
+        message: null,
+        company: null,
+        loading: false,
+        debounceId: null,
+        normalise(raw) {
+            const s = String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+            if (s.length < 3) return null;
+            // CHE prefix → CH
+            if (s.startsWith('CHE')) return { country: 'CH', number: s.slice(3) };
+            // Standard 2-letter prefix
+            if (/^[A-Z]{2}/.test(s)) return { country: s.slice(0, 2), number: s.slice(2) };
+            return null;
+        },
+        check(value, countryHint) {
+            clearTimeout(this.debounceId);
+            this.debounceId = setTimeout(async () => {
+                let payload = this.normalise(value);
+                if (!payload && countryHint) {
+                    payload = { country: countryHint.toUpperCase(), number: String(value).replace(/[^A-Z0-9]/gi, '') };
+                }
+                if (!payload || !payload.country || !payload.number) {
+                    this.status = null;
+                    return;
+                }
+                this.loading = true;
+                this.status = null;
+                try {
+                    const res = await fetch(`${this.endpoint}/${encodeURIComponent(payload.country)}/${encodeURIComponent(payload.number)}`);
+                    if (!res.ok) throw new Error('http ' + res.status);
+                    const data = await res.json();
+                    if (data.status === 'valid' || data.status === 'invalid') {
+                        this.status = data.status;
+                        this.company = data.name || null;
+                        this.message = data.message || null;
+                    } else {
+                        this.status = null;
+                    }
+                } catch (e) {
+                    this.status = null;
+                } finally {
+                    this.loading = false;
+                }
+            }, 600);
+        }
+    }"
+    x-init="
+        const vatField = document.querySelector('input[name=taxvat], input[name=vat_id]');
+        const countryField = document.querySelector('select[name=country_id]');
+        if (vatField) {
+            vatField.addEventListener('input', () => check(vatField.value, countryField ? countryField.value : ''));
+            countryField && countryField.addEventListener('change', () => check(vatField.value, countryField.value));
+            if (vatField.value) check(vatField.value, countryField ? countryField.value : '');
+        }
+    "
+    class="byte8-vat-indicator mt-2"
+    aria-live="polite"
+>
+    <template x-if="loading">
+        <span class="inline-flex items-center gap-2 text-sm text-gray-500">
+            <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"/>
+                <path d="M4 12a8 8 0 018-8" stroke="currentColor" stroke-width="3" class="opacity-75"/>
+            </svg>
+            <?= $block->escapeHtml(__('Checking VAT number…')) ?>
+        </span>
+    </template>
+
+    <template x-if="!loading && status === 'valid'">
+        <div class="rounded-md bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-800">
+            <strong><?= $block->escapeHtml(__('VAT number is valid.')) ?></strong>
+            <span x-show="company" x-text="' — ' + company"></span>
+        </div>
+    </template>
+
+    <template x-if="!loading && status === 'invalid'">
+        <div class="rounded-md bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-800">
+            <strong><?= $block->escapeHtml(__('VAT number is not valid.')) ?></strong>
+            <span x-show="message" x-text="' — ' + message" class="text-red-700"></span>
+        </div>
+    </template>
+</div>
