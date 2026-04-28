@@ -12,6 +12,18 @@ under the VAT input as the customer types.
 - No additional JS dependencies — Alpine + Tailwind only, both ship with
   Hyvä
 
+## Core module
+
+This is a storefront companion — it does nothing on its own. Install the
+core validator first: **[byte8/module-vat-validator](https://github.com/byte8io/magento-vat-validator)**.
+That module provides the EU VIES / UK HMRC / Swiss UID validation, REST
+endpoints, customer-group mapping, audit log, and CLI. This module just
+wires a live indicator into Hyvä forms.
+
+```bash
+composer require byte8/module-vat-validator
+```
+
 ## Install
 
 ```bash
